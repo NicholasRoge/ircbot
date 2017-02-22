@@ -127,7 +127,7 @@ void IrcConnection::join(const string& channel)
 
 void IrcConnection::send(const string& recipient, const string& message)
 {
-    this->command("PRIVMSG", recipient + " " + message);
+    this->command("PRIVMSG", recipient + " :" + message);
 }
 
 
