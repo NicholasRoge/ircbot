@@ -133,7 +133,7 @@ void IrcConnection::send(const string& recipient, const string& message)
 
 void IrcConnection::leave(const string& channel)
 {
-    this->command("LEAVE", channel);
+    this->command("PART", channel);
 }
 
 void IrcConnection::listen()
