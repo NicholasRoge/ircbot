@@ -1,7 +1,7 @@
 BUILD_DIR=bin
 TARGET=ircbot
 COMPILE_OPTS=--std=c++14
-SOURCE=src/Main.cpp src/IrcConnection.cpp
+SOURCE=src/Main.cpp src/IrcConnection.cpp src/Socket.cpp
 
 all:
 	mkdir -p "$(BUILD_DIR)"

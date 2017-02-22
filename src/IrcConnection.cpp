@@ -1,28 +1,70 @@
 #include "IrcConnection.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/poll.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
+#include <exception>
+#include <stdexcept>
 #include <iostream>
 
 
+using std::exception;
+using std::runtime_error;
 using std::string;
+using std::thread;
+using std::vector;
 
 
-IrcConnection::IrcConnection(const string& server, unsigned short port)
+IrcMessage IrcMessage::parse(string s)
 {
-    this->server = server;
+    size_t offset = 0;
+
+    IrcMessage message;
+
+    if (s[0] == ':') {
+        message.prefix = IrcMessage::nextWord(s);
+        message.prefix.erase(0, 1);
+    }
+
+    message.command = IrcMessage::nextWord(s);
+    
+    while (!s.empty()) {
+        if (s[0] == ':') {
+            message.tail = s;
+            message.tail.erase(0, 1);
+
+            break;
+        } else {
+            message.arguments.push_back(IrcMessage::nextWord(s));
+        }
+    }
+
+    return message;
+}
+
+string IrcMessage::nextWord(string& s)
+{
+    auto end = s.find(" ");
+    if (end == string::npos) {
+        string word(s);
+        s.clear();
+        return word;
+        throw runtime_error("Malformed irc message.");
+    } else {
+        string word(s.begin(), s.begin() + end);
+        s.erase(0, end + 1);
+        return word;
+    }
+
+}
+
+
+IrcConnection::IrcConnection(const string& url, unsigned short port)
+{
+    this->url = url;
     this->port = port;
-    this->socketHandle = 0;
-    this->serverInfo = nullptr;
+    this->messagePartial = "";
+
+    this->socket.onData([this](void* data, size_t byteCount) {
+        this->onData(data, byteCount);
+    });
 }
 
 IrcConnection::~IrcConnection()
@@ -30,89 +72,60 @@ IrcConnection::~IrcConnection()
     this->disconnect();
 }
 
-bool IrcConnection::connect()
+bool IrcConnection::connect(const string& nick, const string& user, const string& userComment)
 {
-    if (this->socketHandle) {
+    if (this->socket) {
         return true;
     }
 
-    addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_CANONNAME;
-
-    char serverPort_whyIsThisAString[12];
-    sprintf(serverPort_whyIsThisAString, "%d", this->port);
-    int error1 = getaddrinfo(
-        this->server.c_str(), 
-        serverPort_whyIsThisAString,
-        &hints, 
-        &this->serverInfo
-    );
-    if (error1) {
+    if (!this->socket.connectTo(this->url, this->port)) {
         return false;
     }
 
-    for (;this->serverInfo;this->serverInfo = this->serverInfo->ai_next) {
-        this->socketHandle = socket(
-            this->serverInfo->ai_family, 
-            this->serverInfo->ai_socktype,
-            this->serverInfo->ai_protocol
-        );
-        if (!this->socketHandle) {
-            continue;
-        }
+    this->setUser(user, userComment);
+    this->setNick(nick);
 
-        int error2 = ::connect(
-            this->socketHandle, 
-            this->serverInfo->ai_addr, 
-            this->serverInfo->ai_addrlen
-        );       
-        if (error2 == -1) {
-            close(this->socketHandle);
-            this->socketHandle = 0;
-
-            continue;
-        }
-
-        break;
-    }
-    if (!this->serverInfo) {
-        return false;
-    }
-
-    std::cout << "Connected." << std::endl;
     return true;
 }
 
 void IrcConnection::disconnect()
 {
-    if (!this->socketHandle) {
-        return;
-    }
-
-    close(this->socketHandle);
-    this->socketHandle = 0;
-
-
-    freeaddrinfo(this->serverInfo);
-    this->serverInfo = nullptr;
-
-    std::cout << "Disconnected." << std::endl;
+    this->socket.disconnect();
+    this->messagePartial = "";
 }
 
-void IrcConnection::command(const string& cmd, const string& args)
+bool IrcConnection::connected() const
 {
-    string data = cmd + " " + args + "\r\n";
+    return this->socket.connected();
+}
+
+IrcConnection::operator bool() const
+{
+    return this->connected();
+}
+
+void IrcConnection::command(const string& command, const string& args)
+{
+    string data = command + " " + args + "\r\n";
+
+    if (data.length() > 510) {
+        throw runtime_error("Cannot send messages longer than 510 characters.");
+    }
+
     std::cout << "[37m" << data << "[0m";
-    sendto(this->socketHandle, data.c_str(), data.size(), 0, this->serverInfo->ai_addr, this->serverInfo->ai_addrlen);
-    //TODO: Send through the socket
+    try {
+        this->socket.write(data);
+    } catch (exception& e) {
+        std::cerr << "[31m";
+        std::cerr << "Failed to send message.  Cause:" << std::endl;
+        std::cerr << e.what() << std::endl;
+        std::cerr << "[0m";
+    }
 }
 
 void IrcConnection::setUser(const string& user, const string& phrase)
 {
-    this->command("USER", user + " 2 * :" + phrase);
+    this->command("USER", user + " 0 * :" + phrase);
 }
 
 void IrcConnection::setNick(const string& nick)
@@ -136,15 +149,37 @@ void IrcConnection::leave(const string& channel)
     this->command("PART", channel);
 }
 
-void IrcConnection::listen()
+void IrcConnection::whois(const string& nick)
 {
-    char buffer[65536];
+    this->command("WHOIS", nick);
+}
 
-    pollfd  pfd;
-    pfd.fd = this->socketHandle;
-    pfd.events = POLLIN;
-    while (poll(&pfd, 1, 30000)) {
-        auto read = recvfrom(this->socketHandle, buffer, 65536, 0, this->serverInfo->ai_addr, &this->serverInfo->ai_addrlen);
-        std::cout << "[32m" << string(buffer, read) << "[0m";
+void IrcConnection::onMessage(MessageCallback callback)
+{
+    this->messageCallbacks.push_back(callback);
+}
+
+void IrcConnection::onData(void* data, size_t byteCount)
+{
+    this->messagePartial.append((char*)data, byteCount);
+
+    while (true) {
+        auto crlfPos = this->messagePartial.find("\r\n");
+        if (crlfPos == string::npos) {
+            break;
+        }
+
+        auto messageString = this->messagePartial.substr(0, crlfPos);
+        if (!messageString.empty()) {
+            auto message = IrcMessage::parse(messageString);
+            if (message.command == "PING") {
+                this->command("PONG", message.tail);
+            } else {
+                for (auto callback : messageCallbacks) {
+                    callback(*this, message);
+                }
+            }
+        }
+        this->messagePartial.erase(0, crlfPos + 2);
     }
 }
