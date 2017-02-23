@@ -1,6 +1,6 @@
 BUILD_DIR=bin
 TARGET=ircbot
-COMPILE_OPTS=--std=c++14
+COMPILE_OPTS=--std=c++14 -g
 SOURCE=src/Main.cpp src/IrcConnection.cpp src/Socket.cpp
 
 all:

@@ -88,8 +88,13 @@ bool IrcConnection::connect(const string& nick, const string& user, const string
     return true;
 }
 
-void IrcConnection::disconnect()
+void IrcConnection::disconnect(const string& message)
 {
+    if (message.empty()) {
+        this->command("QUIT");
+    } else {
+        this->command("QUIT", ":" + message);
+    }
     this->socket.disconnect();
     this->messagePartial = "";
 }
@@ -106,7 +111,11 @@ IrcConnection::operator bool() const
 
 void IrcConnection::command(const string& command, const string& args)
 {
-    string data = command + " " + args + "\r\n";
+    string data = command;
+    if (!args.empty()) {
+        data += " " + args;
+    }
+    data += "\r\n";
 
     if (data.length() > 510) {
         throw runtime_error("Cannot send messages longer than 510 characters.");
@@ -144,9 +153,13 @@ void IrcConnection::send(const string& recipient, const string& message)
 }
 
 
-void IrcConnection::leave(const string& channel)
+void IrcConnection::leave(const string& channel, const string& message)
 {
-    this->command("PART", channel);
+    if (message.empty()) {
+        this->command("PART", channel);
+    } else {
+        this->command("PART", channel + " :" + message);
+    }
 }
 
 void IrcConnection::whois(const string& nick)
@@ -154,9 +167,22 @@ void IrcConnection::whois(const string& nick)
     this->command("WHOIS", nick);
 }
 
-void IrcConnection::onMessage(MessageCallback callback)
+void IrcConnection::onMessage(MessageCallback callback, MessageFilter filter)
 {
-    this->messageCallbacks.push_back(callback);
+    this->messageCallbacks.push_back(MessageCallbackObject{
+        callback,
+        filter,
+        false
+    });
+}
+
+void IrcConnection::onNextMessage(MessageCallback callback, MessageFilter filter)
+{
+    this->messageCallbacks.push_back(MessageCallbackObject{
+        callback,
+        filter,
+        true
+    });
 }
 
 void IrcConnection::onData(void* data, size_t byteCount)
@@ -175,8 +201,30 @@ void IrcConnection::onData(void* data, size_t byteCount)
             if (message.command == "PING") {
                 this->command("PONG", message.tail);
             } else {
-                for (auto callback : messageCallbacks) {
-                    callback(*this, message);
+                auto iter = this->messageCallbacks.begin();
+                auto end = this->messageCallbacks.end();
+                while (iter != end) {
+                    if (iter->filter && iter->filter(message)) {
+                        std::cout << "[33m";
+                        std::cout << "Filtered callback." << std::endl;
+                        std::cout << "[0m";
+
+                        ++iter;
+
+                        continue;
+                    }
+
+                    iter->callback(*this, message);
+
+                    if (iter->once) {
+                        iter = this->messageCallbacks.erase(iter);
+
+                        std::cout << "[33m";
+                        std::cout << "Removed callback." << std::endl;
+                        std::cout << "[0m";
+                    } else {
+                        ++iter;
+                    }
                 }
             }
         }
