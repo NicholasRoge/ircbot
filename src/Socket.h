@@ -13,6 +13,8 @@ class Socket
 public:
     using DataCallback = std::function<void(void*, size_t)>;
 
+    using DisconnectCallback = std::function<void(Socket&)>;
+
 
     Socket();
 
@@ -23,6 +25,8 @@ public:
     void disconnect();
 
     bool connected() const;
+
+    void onDisconnect(DisconnectCallback callback);
 
     void write(void* data, size_t byteCount);
 
@@ -47,6 +51,8 @@ private:
     std::thread listenThread;
 
     std::list<DataCallback> dataCallbacks;
+
+    std::list<DisconnectCallback> disconnectCallbacks;
 
 
     void startListenThread();
