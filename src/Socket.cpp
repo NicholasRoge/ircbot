@@ -126,11 +126,20 @@ void Socket::disconnect()
     std::cout << "[33m";
     std::cout << "Disconnected." << std::endl;
     std::cout << "[0m";
+
+    for (auto callback : this->disconnectCallbacks) {
+        callback(*this);
+    }
 }
 
 bool Socket::connected() const
 {
     return this->handle != 0;
+}
+
+void Socket::onDisconnect(DisconnectCallback callback)
+{
+    this->disconnectCallbacks.push_back(callback);
 }
 
 void Socket::write(void* data, size_t byteCount)

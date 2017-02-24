@@ -69,7 +69,9 @@ IrcConnection::IrcConnection(const string& url, unsigned short port)
 
 IrcConnection::~IrcConnection()
 {
-    this->disconnect();
+    if (this->connected()) {
+        this->disconnect();
+    }
 }
 
 bool IrcConnection::connect(const string& nick, const string& user, const string& userComment)
@@ -95,8 +97,6 @@ void IrcConnection::disconnect(const string& message)
     } else {
         this->command("QUIT", ":" + message);
     }
-    this->socket.disconnect();
-    this->messagePartial = "";
 }
 
 bool IrcConnection::connected() const
@@ -111,6 +111,10 @@ IrcConnection::operator bool() const
 
 void IrcConnection::command(const string& command, const string& args)
 {
+    if (!this->connected()) {
+        throw runtime_error("Not connected to server.");
+    }
+    
     string data = command;
     if (!args.empty()) {
         data += " " + args;
