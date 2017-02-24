@@ -3,22 +3,9 @@
 #include <string>
 #include <vector>
 
+#include "IrcMessage.h"
 #include "Socket.h"
 
-
-struct IrcMessage
-{
-    std::string prefix;
-    std::string command;
-    std::vector<std::string> arguments;
-    std::string tail;
-
-    
-    static IrcMessage parse(std::string s);
-
-private:
-    static std::string nextWord(std::string& s);
-};
 
 class IrcConnection
 {
@@ -40,7 +27,9 @@ public:
 
     operator bool() const;
 
-    void command(const std::string& command, const std::string& args = "");
+    void sendMessage(const std::string& message);
+
+    void sendMessage(const IrcMessage& message);
 
     void setUser(const std::string& user, const std::string& phrase);
 
@@ -53,6 +42,7 @@ public:
     void leave(const std::string& channel, const std::string& message = "");
 
     void whois(const std::string& nick);
+
 
     void onMessage(MessageCallback callback, MessageFilter satisfying = nullptr);
 

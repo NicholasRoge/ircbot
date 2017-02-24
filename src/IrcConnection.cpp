@@ -12,48 +12,6 @@ using std::thread;
 using std::vector;
 
 
-IrcMessage IrcMessage::parse(string s)
-{
-    size_t offset = 0;
-
-    IrcMessage message;
-
-    if (s[0] == ':') {
-        message.prefix = IrcMessage::nextWord(s);
-        message.prefix.erase(0, 1);
-    }
-
-    message.command = IrcMessage::nextWord(s);
-    
-    while (!s.empty()) {
-        if (s[0] == ':') {
-            message.tail = s;
-            message.tail.erase(0, 1);
-
-            break;
-        } else {
-            message.arguments.push_back(IrcMessage::nextWord(s));
-        }
-    }
-
-    return message;
-}
-
-string IrcMessage::nextWord(string& s)
-{
-    auto end = s.find(" ");
-    if (end == string::npos) {
-        string word(s);
-        s.clear();
-        return word;
-        throw runtime_error("Malformed irc message.");
-    } else {
-        string word(s.begin(), s.begin() + end);
-        s.erase(0, end + 1);
-        return word;
-    }
-
-}
 
 
 IrcConnection::IrcConnection(const string& url, unsigned short port)
@@ -93,9 +51,9 @@ bool IrcConnection::connect(const string& nick, const string& user, const string
 void IrcConnection::disconnect(const string& message)
 {
     if (message.empty()) {
-        this->command("QUIT");
+        this->sendMessage("QUIT");
     } else {
-        this->command("QUIT", ":" + message);
+        this->sendMessage("QUIT :" + message);
     }
 }
 
@@ -109,64 +67,58 @@ IrcConnection::operator bool() const
     return this->connected();
 }
 
-void IrcConnection::command(const string& command, const string& args)
+void IrcConnection::sendMessage(const string& message)
+{
+    IrcMessage m(message);
+    this->sendMessage(m);
+}
+
+void IrcConnection::sendMessage(const IrcMessage& message)
 {
     if (!this->connected()) {
         throw runtime_error("Not connected to server.");
     }
     
-    string data = command;
-    if (!args.empty()) {
-        data += " " + args;
-    }
-    data += "\r\n";
-
+    string data = message.toString();
     if (data.length() > 510) {
         throw runtime_error("Cannot send messages longer than 510 characters.");
     }
-
-#ifdef DEBUG
-    std::cout << "[1;30m";
-    std::cout << data;
-    std::cout << "[0m";
-#endif
-
     this->socket.write(data);
 }
 
 void IrcConnection::setUser(const string& user, const string& phrase)
 {
-    this->command("USER", user + " 0 * :" + phrase);
+    this->sendMessage("USER " + user + " 0 * :" + phrase);
 }
 
 void IrcConnection::setNick(const string& nick)
 {
-    this->command("NICK", nick);
+    this->sendMessage("NICK " + nick);
 }
 
 void IrcConnection::join(const string& channel)
 {
-    this->command("JOIN", channel);
+    this->sendMessage("JOIN " + channel);
 }
 
 void IrcConnection::send(const string& recipient, const string& message)
 {
-    this->command("PRIVMSG", recipient + " :" + message);
+    this->sendMessage("PRIVMSG " + recipient + " :" + message);
 }
 
 
 void IrcConnection::leave(const string& channel, const string& message)
 {
     if (message.empty()) {
-        this->command("PART", channel);
+        this->sendMessage("PART " + channel);
     } else {
-        this->command("PART", channel + " :" + message);
+        this->sendMessage("PART" + channel + " :" + message);
     }
 }
 
 void IrcConnection::whois(const string& nick)
 {
-    this->command("WHOIS", nick);
+    this->sendMessage("WHOIS" + nick);
 }
 
 void IrcConnection::onMessage(MessageCallback callback, MessageFilter filter)
@@ -197,31 +149,29 @@ void IrcConnection::onData(void* data, size_t byteCount)
             break;
         }
 
-        auto messageString = this->messagePartial.substr(0, crlfPos);
-        if (!messageString.empty()) {
-            auto message = IrcMessage::parse(messageString);
-            if (message.command == "PING") {
-                this->command("PONG", message.tail);
-            } else {
-                auto iter = this->messageCallbacks.begin();
-                auto end = this->messageCallbacks.end();
-                while (iter != end) {
-                    if (iter->filter && iter->filter(message)) {
-                        ++iter;
+        IrcMessage message(this->messagePartial);
+        if (message.getCommand() == "PING") {
+            this->sendMessage("PONG " + message.getTrailing());
+        } else {
+            auto iter = this->messageCallbacks.begin();
+            auto end = this->messageCallbacks.end();
+            while (iter != end) {
+                if (iter->filter && iter->filter(message)) {
+                    ++iter;
 
-                        continue;
-                    }
+                    continue;
+                }
 
-                    iter->callback(*this, message);
+                iter->callback(*this, message);
 
-                    if (iter->once) {
-                        iter = this->messageCallbacks.erase(iter);
-                    } else {
-                        ++iter;
-                    }
+                if (iter->once) {
+                    iter = this->messageCallbacks.erase(iter);
+                } else {
+                    ++iter;
                 }
             }
         }
+
         this->messagePartial.erase(0, crlfPos + 2);
     }
 }
