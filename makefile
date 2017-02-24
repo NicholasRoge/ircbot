@@ -1,14 +1,19 @@
 BUILD_DIR=bin
 TARGET=ircbot
-COMPILE_OPTS=--std=c++14 -pthread -g
+STD=c++14
+CFLAGS=--std=$(STD)
+LIBS=-pthread
 SOURCE=src/Main.cpp src/IrcConnection.cpp src/Socket.cpp
 
 all:
 	mkdir -p "$(BUILD_DIR)"
-	g++ $(COMPILE_OPTS) -o "$(BUILD_DIR)/$(TARGET)" $(SOURCE)
+	g++ $(CFLAGS)\
+		$(LIBS)\
+	   	-o "$(BUILD_DIR)/$(TARGET)"\
+	   	$(SOURCE)
 
-test: clean all
-	@$(BUILD_DIR)/$(TARGET)
+debug: CFLAGS:=$(CFLAGS) -g -DDEBUG
+debug: all
 
 clean:
 	rm -rf $(BUILD_DIR)/*
