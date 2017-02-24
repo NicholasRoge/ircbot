@@ -55,9 +55,11 @@ bool Socket::connectTo(const string& url, unsigned short port = 6667)
         return false;
     }
 
-    std::cout << "[33m";
+#ifdef DEBUG
+    std::cout << "[1;30m";
     std::cout << "Connected to " << url << ":" << port << "." << std::endl;
     std::cout << "[0m";
+#endif
 
     this->startListenThread();
 
@@ -123,9 +125,11 @@ void Socket::disconnect()
     freeaddrinfo(this->target);
     this->target = nullptr;
     
-    std::cout << "[33m";
+#ifdef DEBUG
+    std::cout << "[1;30m";
     std::cout << "Disconnected." << std::endl;
     std::cout << "[0m";
+#endif
 
     for (auto callback : this->disconnectCallbacks) {
         callback(*this);
@@ -161,11 +165,13 @@ void Socket::write(void* data, size_t byteCount)
             throw runtime_error(
                 "Call to sendto resulted in an error.  errno:  " + to_string(errno)
             );
-        } else {
-            std::cout << "[33m";
-            std::cout << "Sent " << bytesSent << " bytes." << std::endl;
-            std::cout << "[0m";
         }
+
+#ifdef DEBUG
+        std::cout << "[1;30m";
+        std::cout << "Sent " << bytesSent << " bytes." << std::endl;
+        std::cout << "[0m";
+#endif
 
         data = (unsigned char*)data + bytesSent;
         byteCount -= bytesSent;
@@ -215,9 +221,13 @@ void Socket::listen()
             this->disconnect();
         } else {
             auto bytesRead = recv(this->handle, buffer, 1024, 0);
-            std::cout << "[33m";
+
+#ifdef DEBUG
+            std::cout << "[1;30m";
             std::cout << "recv'd " << bytesRead << " bytes." << std::endl;
             std::cout << "[0m";
+#endif
+
             if (bytesRead == 0) {
                 this->disconnect();
             } else {

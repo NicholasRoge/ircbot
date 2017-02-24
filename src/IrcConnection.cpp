@@ -125,15 +125,13 @@ void IrcConnection::command(const string& command, const string& args)
         throw runtime_error("Cannot send messages longer than 510 characters.");
     }
 
-    std::cout << "[37m" << data << "[0m";
-    try {
-        this->socket.write(data);
-    } catch (exception& e) {
-        std::cerr << "[31m";
-        std::cerr << "Failed to send message.  Cause:" << std::endl;
-        std::cerr << e.what() << std::endl;
-        std::cerr << "[0m";
-    }
+#ifdef DEBUG
+    std::cout << "[1;30m";
+    std::cout << data;
+    std::cout << "[0m";
+#endif
+
+    this->socket.write(data);
 }
 
 void IrcConnection::setUser(const string& user, const string& phrase)
@@ -209,10 +207,6 @@ void IrcConnection::onData(void* data, size_t byteCount)
                 auto end = this->messageCallbacks.end();
                 while (iter != end) {
                     if (iter->filter && iter->filter(message)) {
-                        std::cout << "[33m";
-                        std::cout << "Filtered callback." << std::endl;
-                        std::cout << "[0m";
-
                         ++iter;
 
                         continue;
@@ -222,10 +216,6 @@ void IrcConnection::onData(void* data, size_t byteCount)
 
                     if (iter->once) {
                         iter = this->messageCallbacks.erase(iter);
-
-                        std::cout << "[33m";
-                        std::cout << "Removed callback." << std::endl;
-                        std::cout << "[0m";
                     } else {
                         ++iter;
                     }
