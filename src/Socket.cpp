@@ -1,6 +1,7 @@
 #include "Socket.h"
 
 #include <arpa/inet.h>
+#include <cstring>
 #include <errno.h>
 #include <iostream>
 #include <netinet/in.h>
@@ -13,6 +14,7 @@
 #include <sys/types.h>
 
 
+using std::memset;
 using std::min;
 using std::runtime_error;
 using std::string;
@@ -205,10 +207,14 @@ void Socket::listen()
         } else {
             auto bytesRead = recv(this->handle, buffer, 1024, 0);
             std::cout << "[33m";
-            std::cout << "Read " << bytesRead << " bytes." << std::endl;
+            std::cout << "recv'd " << bytesRead << " bytes." << std::endl;
             std::cout << "[0m";
-            for (auto callback : this->dataCallbacks) {
-                callback(buffer, bytesRead);
+            if (bytesRead == 0) {
+                this->disconnect();
+            } else {
+                for (auto callback : this->dataCallbacks) {
+                    callback(buffer, bytesRead);
+                }
             }
         }
     }
