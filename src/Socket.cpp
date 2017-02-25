@@ -224,7 +224,7 @@ void Socket::listen()
 
 #ifdef DEBUG
             std::cout << "[1;30m";
-            std::cout << "recv'd " << bytesRead << " bytes." << std::endl;
+            std::cout << "Received " << bytesRead << " bytes." << std::endl;
             std::cout << "[0m";
 #endif
 

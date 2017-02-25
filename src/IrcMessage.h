@@ -53,7 +53,7 @@ public:
 
     void setArgs(std::string args);
 
-    void setArgs(const std::vector<std::string>& args);
+    void setArgs(std::vector<std::string> args);
 
     bool hasArgs() const;
 

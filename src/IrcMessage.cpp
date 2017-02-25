@@ -201,7 +201,7 @@ void IrcMessage::setArgs(string args)
     }
 }
 
-void IrcMessage::setArgs(const vector<string>& args)
+void IrcMessage::setArgs(vector<string> args)
 {
     this->args = args;
 }

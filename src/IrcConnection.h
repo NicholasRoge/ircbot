@@ -15,34 +15,21 @@ public:
     using MessageFilter = std::function<bool(const IrcMessage&)>;
 
 
-    IrcConnection(const std::string& server, unsigned short port = 6667);
+    IrcConnection();
 
     ~IrcConnection();
 
-    bool connect(const std::string& nick, const std::string& user, const std::string& userComment = "");
+    bool connect(const std::string& url, unsigned short port);
 
-    void disconnect(const std::string& message = "");
+    void disconnect();
 
     bool connected() const;
 
     operator bool() const;
 
-    void sendMessage(const std::string& message);
+    void send(const std::string& message);
 
-    void sendMessage(const IrcMessage& message);
-
-    void setUser(const std::string& user, const std::string& phrase);
-
-    void setNick(const std::string& nick);
-
-    void join(const std::string& channel);
-
-    void send(const std::string& recipient, const std::string& message);
-
-    void leave(const std::string& channel, const std::string& message = "");
-
-    void whois(const std::string& nick);
-
+    void send(const IrcMessage& message);
 
     void onMessage(MessageCallback callback, MessageFilter satisfying = nullptr);
 
@@ -58,10 +45,6 @@ private:
 
 
     Socket socket;
-
-    std::string url;
-
-    unsigned short port;
 
     std::string messagePartial;
 

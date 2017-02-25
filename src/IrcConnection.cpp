@@ -14,12 +14,8 @@ using std::vector;
 
 
 
-IrcConnection::IrcConnection(const string& url, unsigned short port)
+IrcConnection::IrcConnection()
 {
-    this->url = url;
-    this->port = port;
-    this->messagePartial = "";
-
     this->socket.onData([this](void* data, size_t byteCount) {
         this->onData(data, byteCount);
     });
@@ -27,34 +23,31 @@ IrcConnection::IrcConnection(const string& url, unsigned short port)
 
 IrcConnection::~IrcConnection()
 {
-    if (this->connected()) {
-        this->disconnect();
-    }
+    this->disconnect();
 }
 
-bool IrcConnection::connect(const string& nick, const string& user, const string& userComment)
+bool IrcConnection::connect(const string& url, unsigned short port)
 {
     if (this->socket) {
         return true;
     }
 
-    if (!this->socket.connectTo(this->url, this->port)) {
+    if (!this->socket.connectTo(url, port)) {
         return false;
     }
 
-    this->setUser(user, userComment);
-    this->setNick(nick);
+    this->messagePartial = "";
 
     return true;
 }
 
-void IrcConnection::disconnect(const string& message)
+void IrcConnection::disconnect()
 {
-    if (message.empty()) {
-        this->sendMessage("QUIT");
-    } else {
-        this->sendMessage("QUIT :" + message);
+    if (!this->connected()) {
+        return;
     }
+    
+    this->socket.disconnect();
 }
 
 bool IrcConnection::connected() const
@@ -67,13 +60,13 @@ IrcConnection::operator bool() const
     return this->connected();
 }
 
-void IrcConnection::sendMessage(const string& message)
+void IrcConnection::send(const string& message)
 {
     IrcMessage m(message);
-    this->sendMessage(m);
+    this->send(m);
 }
 
-void IrcConnection::sendMessage(const IrcMessage& message)
+void IrcConnection::send(const IrcMessage& message)
 {
     if (!this->connected()) {
         throw runtime_error("Not connected to server.");
@@ -86,57 +79,22 @@ void IrcConnection::sendMessage(const IrcMessage& message)
     this->socket.write(data);
 }
 
-void IrcConnection::setUser(const string& user, const string& phrase)
-{
-    this->sendMessage("USER " + user + " 0 * :" + phrase);
-}
-
-void IrcConnection::setNick(const string& nick)
-{
-    this->sendMessage("NICK " + nick);
-}
-
-void IrcConnection::join(const string& channel)
-{
-    this->sendMessage("JOIN " + channel);
-}
-
-void IrcConnection::send(const string& recipient, const string& message)
-{
-    this->sendMessage("PRIVMSG " + recipient + " :" + message);
-}
-
-
-void IrcConnection::leave(const string& channel, const string& message)
-{
-    if (message.empty()) {
-        this->sendMessage("PART " + channel);
-    } else {
-        this->sendMessage("PART" + channel + " :" + message);
-    }
-}
-
-void IrcConnection::whois(const string& nick)
-{
-    this->sendMessage("WHOIS" + nick);
-}
-
 void IrcConnection::onMessage(MessageCallback callback, MessageFilter filter)
 {
-    this->messageCallbacks.push_back(MessageCallbackObject{
-        callback,
-        filter,
-        false
-    });
+    MessageCallbackObject mco;
+    mco.callback = callback;
+    mco.filter = filter;
+    mco.once = false;
+    this->messageCallbacks.push_back(mco);
 }
 
 void IrcConnection::onNextMessage(MessageCallback callback, MessageFilter filter)
 {
-    this->messageCallbacks.push_back(MessageCallbackObject{
-        callback,
-        filter,
-        true
-    });
+    MessageCallbackObject mco;
+    mco.callback = callback;
+    mco.filter = filter;
+    mco.once = true;
+    this->messageCallbacks.push_back(mco);
 }
 
 void IrcConnection::onData(void* data, size_t byteCount)
@@ -150,25 +108,21 @@ void IrcConnection::onData(void* data, size_t byteCount)
         }
 
         IrcMessage message(this->messagePartial);
-        if (message.getCommand() == "PING") {
-            this->sendMessage("PONG " + message.getTrailing());
-        } else {
-            auto iter = this->messageCallbacks.begin();
-            auto end = this->messageCallbacks.end();
-            while (iter != end) {
-                if (iter->filter && iter->filter(message)) {
-                    ++iter;
+        auto iter = this->messageCallbacks.begin();
+        auto end = this->messageCallbacks.end();
+        while (iter != end) {
+            if (iter->filter && iter->filter(message)) {
+                ++iter;
 
-                    continue;
-                }
+                continue;
+            }
 
-                iter->callback(*this, message);
+            iter->callback(*this, message);
 
-                if (iter->once) {
-                    iter = this->messageCallbacks.erase(iter);
-                } else {
-                    ++iter;
-                }
+            if (iter->once) {
+                iter = this->messageCallbacks.erase(iter);
+            } else {
+                ++iter;
             }
         }
 
