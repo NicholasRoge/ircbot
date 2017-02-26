@@ -24,8 +24,6 @@ void InterpretCommand(IrcClient& client, const IrcMessage& message);
 
 bool IrcInitialized(const IrcMessage& message);
 
-bool Authenticate(IrcClient& client);
-
 void JoinChannel(IrcClient& client);
 
 void SayHello(IrcClient& client);
@@ -41,8 +39,8 @@ int main(int argc, char** argv)
 
     std::cout << "Connecting to server." << std::endl;
 
-    client.setNick(NICK);
-    if (!client.connect(NICK, "Not a bot.  Certainly not.")) {
+    client.setNick(NICK, "hunter07");
+    if (!client.connect(NICK, "Am I a bot?  Certainly not.")) {
         std::cerr << "[31m";
         std::cerr << "Failed to connect to client." << std::endl;
         std::cerr << "[0m";
@@ -51,16 +49,6 @@ int main(int argc, char** argv)
     }
 
     client.waitFor(IrcInitialized);
-
-    std::cout << "Authenticating." << std::endl;
-
-    if (!Authenticate(client)) {
-        std::cerr << "[31m";
-        std::cerr << "Failed to authenticate with NickServ." << std::endl;
-        std::cerr << "[0m";
-
-        return 2;
-    }
 
     std::cout << "Joining channel." << std::endl;
 
@@ -147,32 +135,6 @@ void InterpretCommand(IrcClient& client, const IrcMessage& message)
     } else {
         client.msg(channel, "Sorry, I don't know how to respond to that.");
     }
-}
-
-bool Authenticate(IrcClient& client)
-{
-    bool authSucceeded;
-
-    client.msg("NickServ", "IDENTIFY hunter07");
-    client.waitFor([&authSucceeded](const IrcMessage& message) {
-        if (message.getNick() != "NickServ") {
-            return false;
-        }
-
-        string trailing = message.getTrailing();
-        if (trailing.find("now identified") != string::npos) {
-            authSucceeded = true;
-            return true;
-        } else if (trailing.find("not identified") != string::npos) {
-            authSucceeded = false;
-            return true;
-        } else {
-            return false;
-        }
-    });
-
-    return authSucceeded;
-
 }
 
 void JoinChannel(IrcClient& client)

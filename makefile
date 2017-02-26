@@ -3,7 +3,7 @@ TARGET=ircbot
 STD=c++14
 CFLAGS=--std=$(STD)
 LIBS=-pthread
-SOURCE=src/Socket.cpp src/IrcMessage.cpp src/IrcConnection.cpp src/IrcClient.cpp src/Main.cpp 
+SOURCE=src/Base64.cpp src/Socket.cpp src/IrcMessage.cpp src/IrcConnection.cpp src/IrcClient.cpp src/Main.cpp 
 
 all:
 	mkdir -p "$(BUILD_DIR)"

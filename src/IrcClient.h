@@ -63,7 +63,7 @@ public:
     void waitForResponse(unsigned short code);
 
 
-    void setNick(const std::string& nick);
+    void setNick(const std::string& nick, const std::string& password = "");
 
     void join(const std::string& channel);
 
@@ -82,6 +82,9 @@ private:
 
     std::string nick;
 
+    std::string password;
+
+    void authenticate(const std::string& user, const std::string& realName, int mode = 1);
 
     void setUser(const std::string& user, const std::string& realName, int mode = 0);
 };

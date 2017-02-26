@@ -1,7 +1,10 @@
 #include "IrcClient.h"
 
+#include <iostream>
+#include <cstring>
 #include <thread>
 
+#include "Base64.h"
 #include "InterruptedException.h"
 
 
@@ -75,15 +78,73 @@ bool IrcClient::connect(const string& user, const string& realName, int mode)
         return false;
     }
 
-    this->setUser(user, realName, mode);
-    if (this->nick.empty()) {
-        this->setNick(user);
-    } else {
-        this->setNick(this->nick);
-    }
+    this->authenticate(user, realName, mode);
+
     this->waitForResponse(1);
 
     return true;
+}
+
+void IrcClient::authenticate(const std::string& user, const std::string& realName, int mode)
+{
+    if (!this->password.empty()) {
+        this->connection.send("CAP REQ :sasl");
+        this->onNextMessage(
+            [](const IrcMessage& message) {
+                if (message.getCommand() != "CAP") {
+                    return false;
+                }
+                
+                if (message.getTrailing().find("sasl") == string::npos) {
+                    return false;
+                }
+
+                return true;
+            },
+            [user](IrcClient& client, const IrcMessage& message) {
+                if (message.getArg(1) == "ACK") {
+                    client.connection.send("AUTHENTICATE PLAIN");
+                    client.onNextMessage(
+                        [](const IrcMessage& message) {
+                            return message.getCommand() == "AUTHENTICATE" && message.getArg(0) == "+";
+                        },
+                        [user](IrcClient& client, const IrcMessage& message) {
+                            string authDetails = "";
+                            authDetails.append(user);
+                            authDetails.append("\0", 1);
+                            authDetails.append(client.nick);
+                            authDetails.append("\0", 1);
+                            std::cout << client.password << std::endl;
+                            authDetails.append(client.password);
+                            authDetails = Base64Encode((unsigned const char*)authDetails.c_str(), authDetails.length());
+                            std::cout << authDetails << std::endl;
+
+                            client.connection.send("AUTHENTICATE " + authDetails);
+                            client.onNextMessage(
+                                [](const IrcMessage& message) {
+                                    return message.getCommand() == "900" || message.getCommand() == "904";
+                                },
+                                [](IrcClient& client, const IrcMessage& message) {
+                                    client.connection.send("CAP END");
+                                    // TODO:  trigger authenticated true/false event
+                                }
+                            );
+                        }
+                    );
+                } else {
+                    // TODO:  Fallback authentication method
+                }
+            }
+        );
+        // TODO:  Find a better way to do these asynchronous transactions
+    }
+
+    this->setUser(user, realName, mode);
+    if (this->nick.empty()) {
+        this->setNick(user, "");
+    } else {
+        this->setNick(this->nick, this->password);
+    }
 }
 
 void IrcClient::disconnect(const string& message)
@@ -253,11 +314,19 @@ void IrcClient::setUser(const string& user, const string& realName, int mode)
     this->connection.send(message);
 }
 
-void IrcClient::setNick(const string& nick)
+void IrcClient::setNick(const string& nick, const string& password)
 {
     this->nick = nick;
     if (this->connection) {
         this->connection.send("NICK " + nick);
+    }
+
+    this->password = password;
+    if (this->connection) {
+        if (!password.empty()) {
+            // TODO:  Authenticate the user after a nick change.  Can I reuse
+            // the IrcClient#authenticate method somehow...?
+        }
     }
 }
 
