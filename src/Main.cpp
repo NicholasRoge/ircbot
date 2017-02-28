@@ -11,8 +11,6 @@ using std::vector;
 
 const string NICK = "NottaBot";
 
-const string CHANNEL = "#nottabottest";
-
 
 void PrintIncoming(const string& source, const string& message);
 
@@ -38,16 +36,18 @@ void InitClient(IrcClient& client);
 
 bool IrcInitialized(const IrcMessage& message);
 
-void JoinChannel(IrcClient& client);
+void JoinChannel(IrcClient& client, const string& channel);
 
-void SayHello(IrcClient& client);
+void SayHello(IrcClient& client, const string& channel);
 
 
 int main(int argc, char** argv)
 {
     IrcClient client("irc.freenode.net");
     InitClient(client);
-    JoinChannel(client);
+    for (int arg = 1; arg < argc;++arg) {
+        JoinChannel(client, argv[arg]);
+    }
     while (client) {
         std::this_thread::yield();
     }
@@ -125,7 +125,7 @@ bool IsCommandRequest(const IrcMessage& message)
         return false;
     }
 
-    if (message.getArg(0) != CHANNEL) {
+    if (message.getNick() == NICK || message.getArg(0) == NICK) {
         return false;
     }
 
@@ -219,18 +219,18 @@ bool IrcInitialized(const IrcMessage& message)
     return message.getCommand() == "MODE" && message.getArg(0) == NICK;
 }
 
-void JoinChannel(IrcClient& client)
+void JoinChannel(IrcClient& client, const string& channel)
 {
     std::cout << "\x1B[1;30m";
-    std::cout << "Joining channel." << std::endl;
+    std::cout << "Joining [" << channel << "]." << std::endl;
     std::cout << "\x1B[0m";
 
-    client.join(CHANNEL);
+    client.join(channel);
     client.waitForResponse(366);
-    SayHello(client);
+    SayHello(client, channel);
 }
 
-void SayHello(IrcClient& client) 
+void SayHello(IrcClient& client, const string& channel) 
 {
     static const vector<string> LINES {
         "Hello.  My name is " + NICK + " and I'm definitely not a bot.",
@@ -242,8 +242,8 @@ void SayHello(IrcClient& client)
     std::cout << "Saying hello." << std::endl;
     std::cout << "\x1B[0m";
     for (auto& line : LINES) {
-        PrintOutgoing("[" + CHANNEL + "]", line);
-        client.msg(CHANNEL, line);
+        PrintOutgoing("[" + channel + "]", line);
+        client.msg(channel, line);
     }
 
 }
