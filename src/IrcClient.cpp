@@ -114,10 +114,8 @@ void IrcClient::authenticate(const std::string& user, const std::string& realNam
                             authDetails.append("\0", 1);
                             authDetails.append(client.nick);
                             authDetails.append("\0", 1);
-                            std::cout << client.password << std::endl;
                             authDetails.append(client.password);
                             authDetails = Base64Encode((unsigned const char*)authDetails.c_str(), authDetails.length());
-                            std::cout << authDetails << std::endl;
 
                             client.connection.send("AUTHENTICATE " + authDetails);
                             client.onNextMessage(
