@@ -107,7 +107,7 @@ void ShowHelp(IrcClient& client, const IrcMessage& message)
 {
     static const vector<string> LINES = {
         "Here's all the commands I can respond to:",
-        "  !source",
+        "  !source (restricted:  channel operators only)",
         "    I will display a link to my source code.",
         "  !leave",
         "    Will cause me to leave the channel."
@@ -161,11 +161,22 @@ void InterpretCommand(IrcClient& client, const IrcMessage& message)
             client.msg(channel, line);
         }
     } else if (trailing == "!leave") {
-        for (auto& line : LEAVE_LINES_OP) {
-            PrintOutgoing("[" + message.getArg(0) + "]", line);
-            client.msg(channel, line);
-        }
-        client.leave(channel, "Have a nice day everyone!  I'll see you again soon.");
+        client.whois(message.getNick());
+        client.onNextResponse(319, [channel](IrcClient& client, const IrcMessage& message) {
+            auto pos = message.getTrailing().find(channel);
+            if (pos != 0 && message.getTrailing()[pos - 1] == '@') {
+                for (auto& line : LEAVE_LINES_OP) {
+                    PrintOutgoing("[" + message.getArg(0) + "]", line);
+                    client.msg(channel, line);
+                }
+                client.leave(channel, "Have a nice day everyone!  I'll see you again soon.");
+            } else {
+                for (auto& line : LEAVE_LINES_NONOP) {
+                    PrintOutgoing("[" + message.getArg(0) + "]", line);
+                    client.msg(channel, line);
+                }
+            }
+        });
     } else {
         for (auto& line : UNKNOWN_COMMAND_LINES) {
             PrintOutgoing("[" + message.getArg(0) + "]", line);
@@ -188,7 +199,7 @@ void InitClient(IrcClient& client)
     std::cout << "\x1B[0m";
 
     client.setNick(NICK, "hunter07");
-    if (!client.connect(NICK, "Am I a bot?  Certainly not.")) {
+    if (!client.connect(NICK, "Am I a bot?  Most decidedly not.")) {
         std::cerr << "[31m";
         std::cerr << "Failed to connect to client." << std::endl;
         std::cerr << "[0m";
