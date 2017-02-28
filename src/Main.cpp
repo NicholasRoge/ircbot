@@ -107,9 +107,9 @@ void ShowHelp(IrcClient& client, const IrcMessage& message)
 {
     static const vector<string> LINES = {
         "Here's all the commands I can respond to:",
-        "  !source (restricted:  channel operators only)",
+        "  !source,
         "    I will display a link to my source code.",
-        "  !leave",
+        "  !leave (restricted:  channel operators only)",
         "    Will cause me to leave the channel."
     };
 
