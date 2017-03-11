@@ -14,6 +14,8 @@ using std::vector;
 
 const string NICK = "NottaBot";
 
+termios initial_term_settings;
+
 
 void PrintIncoming(const string& source, const string& message);
 
@@ -35,6 +37,10 @@ bool IsCommandRequest(const IrcMessage& message);
 
 void InterpretCommand(IrcClient& client, const IrcMessage& message);
 
+void InitTerminal();
+
+void DeinitTerminal();
+
 void InitClient(IrcClient& client);
 
 bool IrcInitialized(const IrcMessage& message);
@@ -46,14 +52,25 @@ void SayHello(IrcClient& client, const string& channel);
 
 int main(int argc, char** argv)
 {
+    InitTerminal();
+
     IrcClient client("irc.freenode.net");
     InitClient(client);
     for (int arg = 1; arg < argc;++arg) {
         JoinChannel(client, argv[arg]);
     }
+
     while (client) {
-        std::this_thread::yield();
+        char c = getchar();
+        printf("%c", c);
+        if (c == 'q') {
+            break;
+        }
     }
+
+    client.disconnect();
+
+    DeinitTerminal();
 
     return 0;
 }
@@ -186,6 +203,21 @@ void InterpretCommand(IrcClient& client, const IrcMessage& message)
             client.msg(channel, line);
         }
     }
+}
+
+void InitTerminal()
+{
+    termios settings;
+
+    tcgetattr(STDIN_FILENO, &initial_term_settings);
+    settings = initial_term_settings;
+    settings.c_lflag &= (~ICANON & ~ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &settings);
+}
+
+void DeinitTerminal()
+{
+    tcsetattr(STDIN_FILENO, TCSANOW, &initial_term_settings);
 }
 
 void InitClient(IrcClient& client)
