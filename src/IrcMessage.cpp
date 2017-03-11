@@ -1,4 +1,4 @@
-#include "IrcMessage.h"
+#include <IrcMessage.h>
 
 
 using std::string;

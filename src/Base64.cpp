@@ -24,7 +24,7 @@
     René Nyffenegger rene.nyffenegger@adp-gmbh.ch
 */
 
-#include "Base64.h"
+#include <Base64.h>
 
 #include <iostream>
 #include <string>

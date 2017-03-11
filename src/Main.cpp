@@ -1,8 +1,11 @@
 #include <iostream>
+#include <stdio.h>
 #include <thread>
+#include <termios.h>
+#include <unistd.h>
 #include <vector>
 
-#include "IrcClient.h"
+#include <IrcClient.h>
 
 
 using std::string;

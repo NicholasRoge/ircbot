@@ -1,11 +1,11 @@
-#include "IrcClient.h"
+#include <IrcClient.h>
 
 #include <iostream>
 #include <cstring>
 #include <thread>
 
-#include "Base64.h"
-#include "InterruptedException.h"
+#include <Base64.h>
+#include <InterruptedException.h>
 
 
 using std::runtime_error;

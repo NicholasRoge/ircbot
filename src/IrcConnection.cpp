@@ -1,4 +1,4 @@
-#include "IrcConnection.h"
+#include <IrcConnection.h>
 
 #include <exception>
 #include <stdexcept>
