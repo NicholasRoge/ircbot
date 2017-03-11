@@ -62,7 +62,6 @@ int main(int argc, char** argv)
 
     while (client) {
         char c = getchar();
-        printf("%c", c);
         if (c == 'q') {
             break;
         }
