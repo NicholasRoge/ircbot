@@ -4,7 +4,7 @@
 #include <IrcConnection.h>
 
 
-using MessageCallbackTrigger = std::function<bool(const IrcMessage&)>;
+using MessageCallbackTrigger = std::function<bool(const irc::message&)>;
 
 
 MessageCallbackTrigger operator&&(const MessageCallbackTrigger& lop, const MessageCallbackTrigger& rop);
@@ -14,7 +14,7 @@ MessageCallbackTrigger operator||(const MessageCallbackTrigger& lop, const Messa
 class IrcClient
 {
 public:
-    using MessageCallback = std::function<void(IrcClient&, const IrcMessage&)>;
+    using MessageCallback = std::function<void(IrcClient&, const irc::message&)>;
 
 
     IrcClient(const std::string& url, unsigned short port = 6667);

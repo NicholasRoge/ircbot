@@ -3,17 +3,18 @@
 #include <string>
 #include <vector>
 
-#include <IrcMessage.h>
+#include <irc/message.h>
 #include <Socket.h>
 
 
 class IrcConnection
 {
 public:
-    using MessageCallback = std::function<void(IrcConnection&, const IrcMessage&)>;
+    using MessageCallback = std::function<void(IrcConnection&, const irc::message&)>;
 
-    using MessageFilter = std::function<bool(const IrcMessage&)>;
-
+    using MessageFilter = std::function<bool(const irc::message&)>;
+// TODO:  Rename to MessageRejector.
+// TODO:  Define MessageSelector.
 
     IrcConnection();
 
@@ -29,7 +30,7 @@ public:
 
     void send(const std::string& message);
 
-    void send(const IrcMessage& message);
+    void send(const irc::message& message);
 
     void onMessage(MessageCallback callback, MessageFilter satisfying = nullptr);
 

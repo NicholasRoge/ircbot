@@ -1,13 +1,15 @@
+INCLUDE_DIR=include
 BUILD_DIR=bin
 TARGET=ircbot
 STD=c++14
 CFLAGS=--std=$(STD)
 LIBS=-pthread
-SOURCE=src/Base64.cpp src/Socket.cpp src/IrcMessage.cpp src/IrcConnection.cpp src/IrcClient.cpp src/Main.cpp 
+SOURCE=src/*.cpp src/irc/*.cpp
 
 all:
 	mkdir -p "$(BUILD_DIR)"
 	g++ $(CFLAGS)\
+		-I "$(INCLUDE_DIR)"\
 		$(LIBS)\
 	   	-o "$(BUILD_DIR)/$(TARGET)"\
 	   	$(SOURCE)

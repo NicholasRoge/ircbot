@@ -1,96 +1,72 @@
+#include <array>
 #include <string>
 #include <vector>
 
 
-class IrcMessage
+namespace irc
 {
-public:
-    IrcMessage(std::string s = "");
+    class message
+    {
+    public:
+        message();
 
-    std::string getPrefix() const;
+        message(const std::string& s);
 
-    void setPrefix(const std::string& prefix);
+        std::string prefix() const;
 
-    bool hasPrefix() const;
+        void prefix(const std::string& prefix);
 
-    std::string getOrigin() const;
+        std::string origin() const;
 
-    void setOrigin(const std::string& origin);
+        void origin(const std::string& origin);
 
-    bool hasOrigin() const;
+        std::string server() const;
 
-    std::string getServer() const;
+        void server(const std::string& prefix);
 
-    void setServer(const std::string& prefix);
+        std::string nick() const;
 
-    bool hasServer() const;
+        void nick(const std::string& nick);
 
-    std::string getNick() const;
+        std::string user() const;
 
-    void setNick(const std::string& nick);
+        void user(const std::string& user);
 
-    bool hasNick() const;
+        std::string host() const;
 
-    std::string getUser() const;
+        void host(const std::string& host);
 
-    void setUser(const std::string& user);
+        std::string command() const;
 
-    bool hasUser() const;
+        void command(const std::string& command);
 
-    std::string getHost() const;
+        std::vector<std::string> args() const;
 
-    void setHost(const std::string& host);
+        void args(std::string args);
 
-    bool hasHost() const;
+        void args(words args);
 
-    std::string getCommand() const;
+        void args(words::iterator first, words::iterator last);
 
-    void setCommand(const std::string& command);
+        void arg(size_t offset, const std::string& arg);
+        
+        std::string tail() const;
 
-    bool hasCommand() const;
+        void tail(const std::string& tail);
 
-    std::vector<std::string> getArgs() const;
+        operator std::string() const;
 
-    void setArgs(std::string args);
+    private:
+        std::string origin;
 
-    void setArgs(std::vector<std::string> args);
+        std::string user;
 
-    bool hasArgs() const;
+        std::string host;
 
-    size_t getArgCount() const;
+        std::string command;
+        
+        words       arguments;
 
-    std::string getArg(size_t offset) const;
-
-    void setArg(size_t offset, const std::string& arg);
-
-    void insertArg(size_t offset, const std::string& arg);
-
-    void prependArg(const std::string& arg);
-
-    void appendArg(const std::string& arg);
-
-    void removeArg(size_t offset);
-
-    std::string getTrailing() const;
-
-    void setTrailing(const std::string& trailing);
-
-    bool hasTrailing() const;
-
-    std::string toString() const;
-
-    bool isResponse() const;
-
-private:
-    std::string origin;
-
-    std::string user;
-
-    std::string host;
-
-    std::string command;
-    
-    std::vector<std::string> args;
-    
-    std::string trailing;
-};
+        std::string tail
+    };
+}

@@ -50,6 +50,8 @@ private:
 
     std::thread listenThread;
 
+    bool listening;
+
     std::list<DataCallback> dataCallbacks;
 
     std::list<DisconnectCallback> disconnectCallbacks;
