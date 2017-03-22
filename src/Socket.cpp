@@ -17,7 +17,6 @@
 
 
 using std::memset;
-using std::min;
 using std::runtime_error;
 using std::string;
 using std::thread;
@@ -27,6 +26,7 @@ using std::to_string;
 Socket::Socket()
 {
     this->handle = 0;
+    this->listening = false;
 }
 
 Socket::~Socket()
@@ -119,6 +119,11 @@ void Socket::disconnect()
         return;
     }
 
+    this->listening=false;
+    if (this->listenThread.joinable()) {
+        this->listenThread.join();
+    }
+
     close(this->handle);
     this->handle = 0;
 
@@ -205,7 +210,9 @@ void Socket::listen()
     pollfd pfd;
     pfd.fd = this->handle;
     pfd.events = POLLIN | POLLHUP;
-    while (this->connected()) {
+
+    this->listening = true;
+    while (this->listening) {
         auto result = poll(&pfd, 1, 0);
         if (result == -1) {
             string error_message = "Call to poll failed (returned -1).  errno:  " + to_string(errno);

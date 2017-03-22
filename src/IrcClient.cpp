@@ -40,14 +40,14 @@ string ResponseToCommand(unsigned short response)
 
 MessageCallbackTrigger operator&&(const MessageCallbackTrigger& lop, const MessageCallbackTrigger& rop)
 {
-    return [lop, rop](const IrcMessage& message) {
+    return [lop, rop](const irc::message& message) {
         return lop(message) && rop(message);
     };
 }
 
 MessageCallbackTrigger operator||(const MessageCallbackTrigger& lop, const MessageCallbackTrigger& rop)
 {
-    return [lop, rop](const IrcMessage& message) {
+    return [lop, rop](const irc::message& message) {
         return lop(message) || rop(message);
     };
 }
@@ -57,8 +57,8 @@ IrcClient::IrcClient(const std::string& url, unsigned short port)
     this->url = url;
     this->port = port;
 
-    this->onCommand("PING", [](IrcClient& server, const IrcMessage& message) {
-        server.connection.send("PONG :" + message.getTrailing());
+    this->onCommand("PING", [](IrcClient& server, const irc::message& message) {
+        server.connection.send("PONG :" + message.tail());
     });
 }
 
@@ -91,25 +91,33 @@ void IrcClient::authenticate(const std::string& user, const std::string& realNam
     if (!this->password.empty()) {
         this->connection.send("CAP REQ :sasl");
         this->onNextMessage(
-            [](const IrcMessage& message) {
-                if (message.getCommand() != "CAP") {
+            [](const irc::message& message) {
+                string command = message.command();
+                if (command != "CAP") {
+                    return false;
+                }
+
+                if (message.arg(1) != "ACK" && message.arg(1) != "NACK") {
                     return false;
                 }
                 
-                if (message.getTrailing().find("sasl") == string::npos) {
+                string tail = message.tail();
+                if (tail.find("sasl") == string::npos) {
                     return false;
                 }
 
                 return true;
             },
-            [user](IrcClient& client, const IrcMessage& message) {
-                if (message.getArg(1) == "ACK") {
+            [user](IrcClient& client, const irc::message& message) {
+                if (message.arg(1) == "ACK") {
                     client.connection.send("AUTHENTICATE PLAIN");
                     client.onNextMessage(
-                        [](const IrcMessage& message) {
-                            return message.getCommand() == "AUTHENTICATE" && message.getArg(0) == "+";
+                        [](const irc::message& message) {
+                            auto arg = message.arg(0);
+                            logger::debug(arg.c_str(), arg.length());
+                            return message.command() == "AUTHENTICATE" && message.arg(0) == "+";
                         },
-                        [user](IrcClient& client, const IrcMessage& message) {
+                        [user](IrcClient& client, const irc::message& message) {
                             string authDetails = "";
                             authDetails.append(user);
                             authDetails.append("\0", 1);
@@ -120,10 +128,10 @@ void IrcClient::authenticate(const std::string& user, const std::string& realNam
 
                             client.connection.send("AUTHENTICATE " + authDetails);
                             client.onNextMessage(
-                                [](const IrcMessage& message) {
-                                    return message.getCommand() == "900" || message.getCommand() == "904";
+                                [](const irc::message& message) {
+                                    return message.command() == "900" || message.command() == "904";
                                 },
-                                [](IrcClient& client, const IrcMessage& message) {
+                                [](IrcClient& client, const irc::message& message) {
                                     client.connection.send("CAP END");
                                     // TODO:  trigger authenticated true/false event
                                 }
@@ -136,6 +144,7 @@ void IrcClient::authenticate(const std::string& user, const std::string& realNam
             }
         );
         // TODO:  Find a better way to do these asynchronous transactions
+        // TODO:  Oh dear god find a way.
     }
 
     this->setUser(user, realName, mode);
@@ -168,7 +177,7 @@ IrcClient::operator bool() const
 void IrcClient::onMessage(const MessageCallback& callback)
 {
     this->connection.onMessage(
-        [this, callback](IrcConnection& connection, const IrcMessage& message) {
+        [this, callback](IrcConnection& connection, const irc::message& message) {
             callback(*this, message);
         }
     );
@@ -179,10 +188,10 @@ void IrcClient::onMessage(const MessageCallbackTrigger& trigger, const MessageCa
     // Temporary until I get around to reworking the IrcConnection interface
     // as well
     this->connection.onMessage(
-        [this, callback](IrcConnection& connection, const IrcMessage& message) {
+        [this, callback](IrcConnection& connection, const irc::message& message) {
             callback(*this, message);
         },
-        [trigger](const IrcMessage& message) {
+        [trigger](const irc::message& message) {
             return !trigger(message);
         }
    );
@@ -191,7 +200,7 @@ void IrcClient::onMessage(const MessageCallbackTrigger& trigger, const MessageCa
 void IrcClient::onNextMessage(const MessageCallback& callback)
 {
     this->connection.onNextMessage(
-        [this, callback](IrcConnection& connection, const IrcMessage& message) {
+        [this, callback](IrcConnection& connection, const irc::message& message) {
             callback(*this, message);
         }
     );
@@ -202,10 +211,10 @@ void IrcClient::onNextMessage(const MessageCallbackTrigger& trigger, const Messa
     // Temporary until I get around to reworking the IrcConnection interface
     // as well
     this->connection.onNextMessage(
-        [this, callback](IrcConnection& connection, const IrcMessage& message) {
+        [this, callback](IrcConnection& connection, const irc::message& message) {
             callback(*this, message);
         },
-        [trigger](const IrcMessage& message) {
+        [trigger](const irc::message& message) {
             return !trigger(message);
         }
    );
@@ -214,8 +223,8 @@ void IrcClient::onNextMessage(const MessageCallbackTrigger& trigger, const Messa
 void IrcClient::onCommand(const std::string& command, const MessageCallback& callback)
 {
     this->onMessage(
-        [command](const IrcMessage& message) {
-            return message.getCommand() == command;
+        [command](const irc::message& message) {
+            return message.command() == command;
         },
         callback
     );
@@ -224,8 +233,8 @@ void IrcClient::onCommand(const std::string& command, const MessageCallback& cal
 void IrcClient::onCommand(const std::string& command, const MessageCallbackTrigger& trigger, const MessageCallback& callback)
 {
     this->onMessage(
-        [command](const IrcMessage& message) {
-            return message.getCommand() == command;
+        [command](const irc::message& message) {
+            return message.command() == command;
         } && trigger,
         callback
     );
@@ -234,8 +243,8 @@ void IrcClient::onCommand(const std::string& command, const MessageCallbackTrigg
 void IrcClient::onNextCommand(const std::string& command, const MessageCallback& callback)
 {
     this->onNextMessage(
-        [command](const IrcMessage& message) {
-            return message.getCommand() == command;
+        [command](const irc::message& message) {
+            return message.command() == command;
         },
         callback
     );
@@ -244,8 +253,8 @@ void IrcClient::onNextCommand(const std::string& command, const MessageCallback&
 void IrcClient::onNextCommand(const std::string& command, const MessageCallbackTrigger& trigger, const MessageCallback& callback)
 {
     this->onNextMessage(
-        [command](const IrcMessage& message) {
-            return message.getCommand() == command;
+        [command](const irc::message& message) {
+            return message.command() == command;
         } && trigger,
         callback
     );
@@ -277,7 +286,7 @@ void IrcClient::waitFor(const MessageCallbackTrigger& trigger)
     
     this->onNextMessage(
         trigger,
-        [&block](IrcClient& server, const IrcMessage& message) {
+        [&block](IrcClient& server, const irc::message& message) {
             block = false;
         }
     );
@@ -292,8 +301,8 @@ void IrcClient::waitFor(const MessageCallbackTrigger& trigger)
 
 void IrcClient::waitForCommand(const string& command)
 {
-    this->waitFor([command](const IrcMessage& message) {
-        return message.getCommand() == command;
+    this->waitFor([command](const irc::message& message) {
+        return message.command() == command;
     });
 }
 
@@ -304,12 +313,12 @@ void IrcClient::waitForResponse(unsigned short code)
 
 void IrcClient::setUser(const string& user, const string& realName, int mode)
 {
-    IrcMessage message;
-    message.setCommand("USER");
-    message.appendArg(user);
-    message.appendArg(to_string(mode));
-    message.appendArg("*");
-    message.setTrailing(realName);
+    irc::message message;
+    message.command("USER");
+    message.arg(user);
+    message.arg(to_string(mode));
+    message.arg("*");
+    message.tail(realName);
     this->connection.send(message);
 }
 

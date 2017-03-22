@@ -65,17 +65,16 @@ IrcConnection::operator bool() const
 
 void IrcConnection::send(const string& message)
 {
-    IrcMessage m(message);
-    this->send(m);
+    this->send(irc::message(message));
 }
 
-void IrcConnection::send(const IrcMessage& message)
+void IrcConnection::send(const irc::message& message)
 {
     if (!this->connected()) {
         throw runtime_error("Not connected to server.");
     }
     
-    string data = message.toString();
+    string data = string(message);
     if (data.length() > 510) {
         logger::error("IrcConnection::send(message with message.size() > 510) this=0x" + to_hex((size_t)this));
 
@@ -124,7 +123,8 @@ void IrcConnection::onData(void* data, size_t byteCount)
             break;
         }
 
-        IrcMessage message(this->messagePartial);
+
+        irc::message message(this->messagePartial);
 
         logger::debug("Received message:\n    " + string(message));
 

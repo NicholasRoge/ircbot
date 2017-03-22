@@ -21,21 +21,21 @@ void PrintIncoming(const string& source, const string& message);
 
 void PrintOutgoing(const string& recipient, const string& message);
 
-bool IsChannelMention(const IrcMessage& message);
+bool IsChannelMention(const irc::message& message);
 
-bool PrintChannelMessage(IrcClient& client, const IrcMessage& message);
+bool PrintChannelMessage(IrcClient& client, const irc::message& message);
 
-bool IsPrivateMessage(const IrcMessage& message);
+bool IsPrivateMessage(const irc::message& message);
 
-bool PrintPrivateMessage(IrcClient& client, const IrcMessage& message);
+bool PrintPrivateMessage(IrcClient& client, const irc::message& message);
 
-bool IsHelpRequest(const IrcMessage& message);
+bool IsHelpRequest(const irc::message& message);
 
-void ShowHelp(IrcClient& client, const IrcMessage& message);
+void ShowHelp(IrcClient& client, const irc::message& message);
 
-bool IsCommandRequest(const IrcMessage& message);
+bool IsCommandRequest(const irc::message& message);
 
-void InterpretCommand(IrcClient& client, const IrcMessage& message);
+void InterpretCommand(IrcClient& client, const irc::message& message);
 
 void InitTerminal();
 
@@ -43,14 +43,14 @@ void DeinitTerminal();
 
 void InitClient(IrcClient& client);
 
-bool IrcInitialized(const IrcMessage& message);
+bool IrcInitialized(const irc::message& message);
 
 void JoinChannel(IrcClient& client, const string& channel);
 
 void SayHello(IrcClient& client, const string& channel);
 
 
-int main(int argc, char** argv)
+int main(int argc, char** argv, char** watv)
 {
     InitTerminal();
 
@@ -85,44 +85,44 @@ void PrintOutgoing(const string& recipient, const string& message)
     std::cout << NICK << " => " << recipient << ":  " << message << std::endl;
 }
 
-bool IsChannelMention(const IrcMessage& message)
+bool IsChannelMention(const irc::message& message)
 {
-    return message.getCommand() == "PRIVMSG" && message.getNick() != NICK && message.getTrailing().find(NICK) != string::npos;
+    return message.command() == "PRIVMSG" && message.nick() != NICK && message.tail().find(NICK) != string::npos;
 }
 
-bool PrintChannelMessage(IrcClient& client, const IrcMessage& message)
+bool PrintChannelMessage(IrcClient& client, const irc::message& message)
 {
-    PrintIncoming("[" + message.getArg(0) + "]" + message.getNick(), message.getTrailing());
+    PrintIncoming("[" + message.arg(0) + "]" + message.nick(), message.tail());
 }
 
-bool IsPrivateMessage(const IrcMessage& message)
+bool IsPrivateMessage(const irc::message& message)
 {
-    return message.getCommand() == "PRIVMSG" && message.getArg(0) == NICK;
+    return message.command() == "PRIVMSG" && message.arg(0) == NICK;
 }
 
-bool PrintPrivateMessage(IrcClient& client, const IrcMessage& message)
+bool PrintPrivateMessage(IrcClient& client, const irc::message& message)
 {
-    PrintIncoming(message.getNick(), message.getTrailing());
+    PrintIncoming(message.nick(), message.tail());
 }
 
-bool IsHelpRequest(const IrcMessage& message)
+bool IsHelpRequest(const irc::message& message)
 {
-    if (message.getCommand() != "PRIVMSG") {
+    if (message.command() != "PRIVMSG") {
          return false;
     }
 
-    if (message.getArg(0) != NICK) {
+    if (message.arg(0) != NICK) {
         return false;
     }
 
-    if (message.getTrailing() != "help") {
+    if (message.tail() != "help") {
         return false;
     }
 
     return true;
 }
 
-void ShowHelp(IrcClient& client, const IrcMessage& message)
+void ShowHelp(IrcClient& client, const irc::message& message)
 {
     static const vector<string> LINES = {
         "Here's all the commands I can respond to:",
@@ -133,29 +133,29 @@ void ShowHelp(IrcClient& client, const IrcMessage& message)
     };
 
     for (auto& line : LINES) {
-        PrintOutgoing(message.getNick(), line);
-        client.msg(message.getNick(), line);
+        PrintOutgoing(message.nick(), line);
+        client.msg(message.nick(), line);
     }
 }
 
-bool IsCommandRequest(const IrcMessage& message)
+bool IsCommandRequest(const irc::message& message)
 {
-    if (message.getCommand() != "PRIVMSG") {
+    if (message.command() != "PRIVMSG") {
         return false;
     }
 
-    if (message.getNick() == NICK || message.getArg(0) == NICK) {
+    if (message.nick() == NICK || message.arg(0) == NICK) {
         return false;
     }
 
-    if (message.getTrailing()[0] != '!') {
+    if (message.tail()[0] != '!') {
         return false;
     }
 
     return true;
 }
 
-void InterpretCommand(IrcClient& client, const IrcMessage& message)
+void InterpretCommand(IrcClient& client, const irc::message& message)
 {
     static const vector<string> SOURCE_LINES = {
         "Thanks for the interest!  <3",
@@ -172,33 +172,33 @@ void InterpretCommand(IrcClient& client, const IrcMessage& message)
         "I'm sorry, I don't know that command."
     };
 
-    string channel = message.getArg(0);
-    string trailing = message.getTrailing();
+    string channel = message.arg(0);
+    string trailing = message.tail();
     if (trailing == "!source") {
         for (auto& line : SOURCE_LINES) {
-            PrintOutgoing("[" + message.getArg(0) + "]", line);
+            PrintOutgoing("[" + message.arg(0) + "]", line);
             client.msg(channel, line);
         }
     } else if (trailing == "!leave") {
-        client.whois(message.getNick());
-        client.onNextResponse(319, [channel](IrcClient& client, const IrcMessage& message) {
-            auto pos = message.getTrailing().find(channel);
-            if (pos != 0 && message.getTrailing()[pos - 1] == '@') {
+        client.whois(message.nick());
+        client.onNextResponse(319, [channel](IrcClient& client, const irc::message& message) {
+            auto pos = message.tail().find(channel);
+            if (pos != 0 && message.tail()[pos - 1] == '@') {
                 for (auto& line : LEAVE_LINES_OP) {
-                    PrintOutgoing("[" + message.getArg(0) + "]", line);
+                    PrintOutgoing("[" + message.arg(0) + "]", line);
                     client.msg(channel, line);
                 }
                 client.leave(channel, "Have a nice day everyone!  I'll see you again soon.");
             } else {
                 for (auto& line : LEAVE_LINES_NONOP) {
-                    PrintOutgoing("[" + message.getArg(0) + "]", line);
+                    PrintOutgoing("[" + message.arg(0) + "]", line);
                     client.msg(channel, line);
                 }
             }
         });
     } else {
         for (auto& line : UNKNOWN_COMMAND_LINES) {
-            PrintOutgoing("[" + message.getArg(0) + "]", line);
+            PrintOutgoing("[" + message.arg(0) + "]", line);
             client.msg(channel, line);
         }
     }
@@ -248,9 +248,9 @@ void InitClient(IrcClient& client)
     std::cout << "\x1B[0m";
 }
 
-bool IrcInitialized(const IrcMessage& message)
+bool IrcInitialized(const irc::message& message)
 {
-    return message.getCommand() == "MODE" && message.getArg(0) == NICK;
+    return message.command() == "MODE" && message.arg(0) == NICK;
 }
 
 void JoinChannel(IrcClient& client, const string& channel)
