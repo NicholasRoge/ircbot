@@ -4,14 +4,17 @@
 #include <stdexcept>
 #include <iostream>
 
+#include <log.h>
+#include <util.h>
+
 
 using std::exception;
 using std::runtime_error;
 using std::string;
 using std::thread;
+using std::to_string;
 using std::vector;
-
-
+using util::to_hex;
 
 
 IrcConnection::IrcConnection()
@@ -74,7 +77,21 @@ void IrcConnection::send(const IrcMessage& message)
     
     string data = message.toString();
     if (data.length() > 510) {
-        throw runtime_error("Cannot send messages longer than 510 characters.");
+        logger::error("IrcConnection::send(message with message.size() > 510) this=0x" + to_hex((size_t)this));
+
+
+        string what   = "Attempted to send message with message.size() > 510.";
+        string detail = "Given message\n"
+            "    " + string(message) + "\n"
+            "exceeded this limit by " + to_string(data.length() - 510) + " bytes.";
+        
+        string suggestion;
+        if (message.command() == "PRIVMSG") {
+            suggestion = "Consider splitting PRIVMSG messages into multiple"
+                " messages.";
+        }
+
+        throw runtime_error(what + "\n" + detail + "\n" + suggestion);
     }
     this->socket.write(data);
 }
@@ -108,6 +125,9 @@ void IrcConnection::onData(void* data, size_t byteCount)
         }
 
         IrcMessage message(this->messagePartial);
+
+        logger::debug("Received message:\n    " + string(message));
+
         auto iter = this->messageCallbacks.begin();
         auto end = this->messageCallbacks.end();
         while (iter != end) {

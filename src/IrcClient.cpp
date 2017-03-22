@@ -6,6 +6,7 @@
 
 #include <Base64.h>
 #include <InterruptedException.h>
+#include <log.h>
 
 
 using std::runtime_error;

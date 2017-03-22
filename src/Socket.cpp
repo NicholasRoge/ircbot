@@ -13,6 +13,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <log.h>
+
 
 using std::memset;
 using std::min;
@@ -55,11 +57,9 @@ bool Socket::connectTo(const string& url, unsigned short port = 6667)
         return false;
     }
 
-#ifdef DEBUG
-    std::cout << "[1;30m";
-    std::cout << "Connected to " << url << ":" << port << "." << std::endl;
-    std::cout << "[0m";
-#endif
+
+    logger::debug("Socket " + to_string(this->handle) + " connected to " + url + ":" + to_string(port) + ".");
+
 
     this->startListenThread();
 
@@ -125,11 +125,9 @@ void Socket::disconnect()
     freeaddrinfo(this->target);
     this->target = nullptr;
     
-#ifdef DEBUG
-    std::cout << "[1;30m";
-    std::cout << "Disconnected." << std::endl;
-    std::cout << "[0m";
-#endif
+
+    logger::debug("Socket " + to_string(this->handle) + " disconnected.");
+
 
     for (auto callback : this->disconnectCallbacks) {
         callback(*this);
@@ -149,7 +147,9 @@ void Socket::onDisconnect(DisconnectCallback callback)
 void Socket::write(void* data, size_t byteCount)
 {
     if (!this->handle) {
-        throw runtime_error("Socket not connected.");
+        string error_message = "Attempted write to disconnected socket.";
+        logger::error(error_message);
+        throw runtime_error(error_message);
     }
 
     while (byteCount > 0) {
@@ -161,16 +161,16 @@ void Socket::write(void* data, size_t byteCount)
             this->target->ai_addr,
             this->target->ai_addrlen
         );
+
         if (bytesSent == -1) {
-            throw runtime_error(
-                "Call to sendto resulted in an error.  errno:  " + to_string(errno)
-            );
+            string error_message = "Call to sendto failed (returned -1).  errno: " + to_string(errno);
+            logger::error(error_message);
+            throw runtime_error(error_message);
         }
 
 #ifdef DEBUG
-        std::cout << "[1;30m";
-        std::cout << "Sent " << bytesSent << " bytes." << std::endl;
-        std::cout << "[0m";
+        logger::debug("Sent " + to_string(bytesSent) + " bytes on socket " + to_string(this->handle) + ".");
+        logger::debug(data, bytesSent, "socket_" + to_string(this->handle) + "_out.log");
 #endif
 
         data = (unsigned char*)data + bytesSent;
@@ -208,9 +208,9 @@ void Socket::listen()
     while (this->connected()) {
         auto result = poll(&pfd, 1, 0);
         if (result == -1) {
-            throw runtime_error(
-                "Call to poll resulted in an error.  errno:  " + to_string(errno)
-            );
+            string error_message = "Call to poll failed (returned -1).  errno:  " + to_string(errno);
+            logger::error(error_message);
+            throw runtime_error(error_message);
         } else if (result == 0) {
             std::this_thread::yield();
 
@@ -221,18 +221,26 @@ void Socket::listen()
             this->disconnect();
         } else {
             auto bytesRead = recv(this->handle, buffer, 1024, 0);
-
+            if (bytesRead == -1) {
+                if (errno == ENOTSOCK && !this->connected()) {
+                    break;
+                } else {
+                    string error_message = "Call to recv failed (returned -1).  errno:  " + to_string(errno);
+                    logger::error(error_message);
+                    throw runtime_error(error_message);
+                }
+            } else {
 #ifdef DEBUG
-            std::cout << "[1;30m";
-            std::cout << "Received " << bytesRead << " bytes." << std::endl;
-            std::cout << "[0m";
+                logger::debug("Received " + to_string(bytesRead) + " bytes on socket " + to_string(this->handle) + ".");
+                logger::debug(buffer, bytesRead, "socket_" + to_string(this->handle) + "_in.log");
 #endif
 
-            if (bytesRead == 0) {
-                this->disconnect();
-            } else {
-                for (auto callback : this->dataCallbacks) {
-                    callback(buffer, bytesRead);
+                if (bytesRead == 0) {
+                    this->disconnect();
+                } else {
+                    for (auto callback : this->dataCallbacks) {
+                        callback(buffer, bytesRead);
+                    }
                 }
             }
         }
